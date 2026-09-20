@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: so-lenh-stock-app
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: DB_PATH
+        value: /app/backend/data/portfolio.db
+    disk:
+      name: sqlite-data
+      mountPath: /app/backend/data
+      sizeGB: 1

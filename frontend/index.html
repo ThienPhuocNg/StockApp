@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sổ Lệnh — Theo dõi danh mục chứng khoán VN</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d1420; --panel:#131c2b; --panel-2:#182338; --line:#233046;
+    --text:#e7edf5; --muted:#8b9bb4; --muted-2:#5d6d87;
+    --up:#34d399; --down:#f66d6d; --hold:#e8b64c;
+    --accent:#4d8fff;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;
+  }
+  .num{font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums;}
+  header{
+    padding:18px 28px; border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; gap:10px;
+  }
+  header h1{font-size:17px; font-weight:700; letter-spacing:.2px;}
+  header span{color:var(--muted-2); font-size:13px;}
+  .layout{display:grid; grid-template-columns:300px 1fr; gap:0; min-height:calc(100vh - 58px);}
+  .sidebar{border-right:1px solid var(--line); padding:20px; background:var(--panel);}
+  .main{padding:22px 26px;}
+  h2{font-size:13px; font-weight:600; color:var(--muted); margin-bottom:12px;}
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:16px;
+  }
+  .field{margin-bottom:10px;}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:4px;}
+  .field input, .field select{
+    width:100%; background:var(--panel-2); border:1px solid var(--line);
+    color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px;
+  }
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  button{
+    cursor:pointer; border:none; border-radius:6px; font-size:13px; font-weight:600;
+    padding:9px 14px;
+  }
+  .btn-buy{background:var(--up); color:#06281c;}
+  .btn-sell{background:var(--down); color:#340707;}
+  .btn-full{width:100%; margin-top:6px;}
+  .watch-list{margin-top:22px;}
+  .symbol-pill{
+    display:inline-flex; align-items:center; gap:6px; background:var(--panel-2);
+    border:1px solid var(--line); padding:6px 10px; border-radius:20px; font-size:12px;
+    margin:0 6px 6px 0; cursor:pointer;
+  }
+  .symbol-pill.active{border-color:var(--accent); color:var(--accent);}
+  .top-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px;}
+  .stat{padding:14px 16px;}
+  .stat .label{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px;}
+  .stat .value{font-size:22px; font-weight:700; margin-top:6px;}
+  .mid-grid{display:grid; grid-template-columns:1.6fr 1fr; gap:16px; margin-bottom:20px;}
+  .panel-title{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
+  .panel-title h2{margin:0;}
+  #symbolBadge{font-size:20px; font-weight:700;}
+  canvas{max-height:280px;}
+  .signal-box{
+    text-align:center; padding:18px; border-radius:8px; margin-bottom:14px;
+    border:1px solid var(--line);
+  }
+  .signal-box .signal-label{font-size:24px; font-weight:800; letter-spacing:1px;}
+  .signal-buy{color:var(--up);}
+  .signal-sell{color:var(--down);}
+  .signal-hold{color:var(--hold);}
+  .indicator-row{display:flex; justify-content:space-between; font-size:12px; padding:6px 0; border-bottom:1px solid var(--line); color:var(--muted);}
+  .indicator-row span:last-child{color:var(--text);}
+  .disclaimer{font-size:11px; color:var(--muted-2); margin-top:10px; line-height:1.5;}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{text-align:left; color:var(--muted); font-weight:500; font-size:11px; text-transform:uppercase; padding:8px 10px; border-bottom:1px solid var(--line);}
+  td{padding:9px 10px; border-bottom:1px solid var(--line);}
+  .side-buy{color:var(--up); font-weight:600;}
+  .side-sell{color:var(--down); font-weight:600;}
+  .del{color:var(--muted-2); cursor:pointer; font-size:12px;}
+  .del:hover{color:var(--down);}
+  .empty{color:var(--muted-2); font-size:13px; padding:20px 0; text-align:center;}
+  .plc-up{color:var(--up);} .plc-down{color:var(--down);}
+  .err{color:var(--down); font-size:12px; margin-top:6px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Sổ Lệnh</h1>
+  <span>Theo dõi danh mục &amp; tín hiệu mua/bán — HOSE / HNX</span>
+</header>
+
+<div class="layout">
+  <div class="sidebar">
+    <h2>Thêm giao dịch</h2>
+    <div class="card">
+      <div class="field">
+        <label>Mã chứng khoán</label>
+        <input id="txSymbol" placeholder="VD: FPT, VNM, ACB" style="text-transform:uppercase">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Khối lượng</label>
+          <input id="txQty" type="number" placeholder="100">
+        </div>
+        <div class="field">
+          <label>Giá (nghìn VND)</label>
+          <input id="txPrice" type="number" placeholder="45.5">
+        </div>
+      </div>
+      <div class="field">
+        <label>Phí (VND)</label>
+        <input id="txFee" type="number" value="0">
+      </div>
+      <div class="row2">
+        <button class="btn-buy btn-full" onclick="submitTx('BUY')">Mua</button>
+        <button class="btn-sell btn-full" onclick="submitTx('SELL')">Bán</button>
+      </div>
+      <div id="txErr" class="err"></div>
+    </div>
+
+    <div class="watch-list">
+      <h2>Danh mục đang nắm giữ</h2>
+      <div id="watchPills"></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="top-grid" id="statGrid">
+      <div class="card stat"><div class="label">Tổng vốn đã bỏ ra</div><div class="value num" id="statCost">—</div></div>
+      <div class="card stat"><div class="label">Giá trị hiện tại</div><div class="value num" id="statValue">—</div></div>
+      <div class="card stat"><div class="label">Lãi / Lỗ</div><div class="value num" id="statPL">—</div></div>
+      <div class="card stat"><div class="label">Số mã đang giữ</div><div class="value num" id="statCount">—</div></div>
+    </div>
+
+    <div class="mid-grid">
+      <div class="card">
+        <div class="panel-title">
+          <span id="symbolBadge">Chọn một mã ở danh mục →</span>
+          <div id="chartMeta" class="num" style="color:var(--muted); font-size:12px;"></div>
+        </div>
+        <canvas id="priceChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h2>Tín hiệu dự đoán (AI)</h2>
+        <div id="predictBox">
+          <div class="empty">Chọn một mã để xem dự đoán</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Lịch sử giao dịch</h2>
+      <table>
+        <thead><tr><th>Ngày</th><th>Mã</th><th>Loại</th><th>KL</th><th>Giá</th><th>Phí</th><th></th></tr></thead>
+        <tbody id="txTable"><tr><td colspan="7" class="empty">Chưa có giao dịch nào</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// Tu dong dung dung domain hien tai (khi deploy chung 1 service voi backend).
+// Neu ban chay frontend rieng le (vd mo file .html truc tiep, port 5500...),
+// doi thanh dia chi backend that, vd: const API = "https://ten-app.onrender.com";
+const API = (location.protocol === "file:") ? "http://localhost:8000" : window.location.origin;
+let chart = null;
+let currentSymbol = null;
+
+const fmt = n => n === null || n === undefined ? "—" : Number(n).toLocaleString('vi-VN', {maximumFractionDigits:2});
+
+async function api(path, opts) {
+  const res = await fetch(API + path, opts);
+  if (!res.ok) {
+    const body = await res.json().catch(()=>({detail: res.statusText}));
+    throw new Error(body.detail || 'Lỗi không xác định');
+  }
+  return res.json();
+}
+
+async function submitTx(side) {
+  const symbol = document.getElementById('txSymbol').value.trim().toUpperCase();
+  const quantity = parseFloat(document.getElementById('txQty').value);
+  const price = parseFloat(document.getElementById('txPrice').value);
+  const fee = parseFloat(document.getElementById('txFee').value) || 0;
+  const errBox = document.getElementById('txErr');
+  errBox.textContent = '';
+
+  if (!symbol || !quantity || !price) {
+    errBox.textContent = 'Vui lòng nhập đủ mã, khối lượng và giá.';
+    return;
+  }
+  try {
+    await api('/transactions', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({symbol, side, quantity, price, fee})
+    });
+    document.getElementById('txSymbol').value = '';
+    document.getElementById('txQty').value = '';
+    document.getElementById('txPrice').value = '';
+    document.getElementById('txFee').value = '0';
+    await refreshAll();
+  } catch (e) {
+    errBox.textContent = e.message;
+  }
+}
+
+async function deleteTx(id) {
+  await api('/transactions/' + id, {method: 'DELETE'});
+  await refreshAll();
+}
+
+async function loadTransactions() {
+  const txs = await api('/transactions');
+  const tbody = document.getElementById('txTable');
+  if (!txs.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Chưa có giao dịch nào</td></tr>';
+    return;
+  }
+  tbody.innerHTML = txs.map(t => `
+    <tr>
+      <td class="num">${new Date(t.trade_date).toLocaleDateString('vi-VN')}</td>
+      <td>${t.symbol}</td>
+      <td class="${t.side === 'BUY' ? 'side-buy' : 'side-sell'}">${t.side === 'BUY' ? 'MUA' : 'BÁN'}</td>
+      <td class="num">${fmt(t.quantity)}</td>
+      <td class="num">${fmt(t.price)}</td>
+      <td class="num">${fmt(t.fee)}</td>
+      <td><span class="del" onclick="deleteTx(${t.id})">xóa</span></td>
+    </tr>
+  `).join('');
+}
+
+async function loadPortfolio() {
+  const data = await api('/portfolio');
+  const holdings = data.holdings;
+
+  let totalCost = 0, totalValue = 0, hasValue = false;
+  holdings.forEach(h => {
+    totalCost += h.avg_cost * h.quantity;
+    if (h.current_price !== null) {
+      totalValue += h.current_price * h.quantity;
+      hasValue = true;
+    }
+  });
+
+  document.getElementById('statCost').textContent = fmt(totalCost) + ' k';
+  document.getElementById('statValue').textContent = hasValue ? fmt(totalValue) + ' k' : '—';
+  const pl = totalValue - totalCost;
+  const plEl = document.getElementById('statPL');
+  plEl.textContent = hasValue ? (pl >= 0 ? '+' : '') + fmt(pl) + ' k' : '—';
+  plEl.className = 'value num ' + (pl >= 0 ? 'plc-up' : 'plc-down');
+  document.getElementById('statCount').textContent = holdings.length;
+
+  const pills = document.getElementById('watchPills');
+  if (!holdings.length) {
+    pills.innerHTML = '<div class="empty">Chưa có mã nào trong danh mục</div>';
+  } else {
+    pills.innerHTML = holdings.map(h => `
+      <span class="symbol-pill ${h.symbol === currentSymbol ? 'active' : ''}" onclick="selectSymbol('${h.symbol}')">
+        ${h.symbol} · ${fmt(h.quantity)} CP
+      </span>
+    `).join('');
+    if (!currentSymbol) selectSymbol(holdings[0].symbol);
+  }
+}
+
+async function selectSymbol(symbol) {
+  currentSymbol = symbol;
+  document.getElementById('symbolBadge').textContent = symbol;
+  await loadPortfolio();
+  await Promise.all([loadChart(symbol), loadPrediction(symbol)]);
+}
+
+async function loadChart(symbol) {
+  const meta = document.getElementById('chartMeta');
+  try {
+    const data = await api(`/price/${symbol}?days=180`);
+    const labels = data.data.map(d => d.time);
+    const closes = data.data.map(d => d.close);
+    meta.textContent = closes.length ? `${closes[closes.length-1].toLocaleString('vi-VN')} nghìn VND` : '';
+
+    if (chart) chart.destroy();
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: symbol,
+          data: closes,
+          borderColor: '#4d8fff',
+          backgroundColor: 'rgba(77,143,255,0.08)',
+          fill: true,
+          tension: 0.15,
+          pointRadius: 0,
+          borderWidth: 1.6,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#5d6d87', maxTicksLimit: 8 }, grid: { color: '#1a2536' } },
+          y: { ticks: { color: '#5d6d87' }, grid: { color: '#1a2536' } },
+        }
+      }
+    });
+  } catch (e) {
+    meta.textContent = '';
+    document.getElementById('priceChart').getContext('2d').clearRect(0,0,9999,9999);
+  }
+}
+
+async function loadPrediction(symbol) {
+  const box = document.getElementById('predictBox');
+  box.innerHTML = '<div class="empty">Đang tính toán...</div>';
+  try {
+    const p = await api(`/predict/${symbol}`);
+    const cls = p.signal === 'BUY' ? 'signal-buy' : p.signal === 'SELL' ? 'signal-sell' : 'signal-hold';
+    const label = p.signal === 'BUY' ? 'NÊN MUA' : p.signal === 'SELL' ? 'NÊN BÁN' : 'GIỮ / CHỜ';
+    box.innerHTML = `
+      <div class="signal-box">
+        <div class="signal-label ${cls}">${label}</div>
+        <div style="color:var(--muted); font-size:12px; margin-top:4px;">
+          Xác suất tăng giá: <span class="num">${(p.probability_up*100).toFixed(1)}%</span> · Độ tin cậy: ${p.confidence}
+        </div>
+      </div>
+      <div class="indicator-row"><span>RSI (14)</span><span>${p.indicators.rsi14}</span></div>
+      <div class="indicator-row"><span>MACD Histogram</span><span>${p.indicators.macd_hist}</span></div>
+      <div class="indicator-row"><span>SMA20</span><span>${fmt(p.indicators.sma20)}</span></div>
+      <div class="indicator-row"><span>SMA50</span><span>${fmt(p.indicators.sma50)}</span></div>
+      <div class="disclaimer">${p.reason}.<br>${p.disclaimer}</div>
+    `;
+  } catch (e) {
+    box.innerHTML = `<div class="err">${e.message}</div>`;
+  }
+}
+
+async function refreshAll() {
+  await loadTransactions();
+  await loadPortfolio();
+  if (currentSymbol) {
+    await loadChart(currentSymbol);
+    await loadPrediction(currentSymbol);
+  }
+}
+
+refreshAll();
+</script>
+</body>
+</html>
